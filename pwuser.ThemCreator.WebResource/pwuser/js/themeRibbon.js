@@ -1,5 +1,4 @@
 ﻿async function publishModernTheme(executionContext) {
-    debugger;
     Xrm.Utility.showProgressIndicator("Please wait...");
     var formContext = executionContext.getFormContext != null ? executionContext.getFormContext() : executionContext;
     var solutionUniqueName = "pwuser_theme_solution";
@@ -60,7 +59,6 @@
         }
         Xrm.WebApi.execute(execute_SaveSettingValue_Request).then(
             async function success(response) {
-                debugger;
                 if (response.ok) {
                     console.log("Success");
                     var fetchXml = "";
