@@ -4,13 +4,9 @@ using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 using PowerUser365.Utils;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Policy;
 using System.Text;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Linq;
 
 namespace pwuser.ThemeCreator.Plugins
 {
@@ -106,7 +102,6 @@ namespace pwuser.ThemeCreator.Plugins
             xmlTheme = CreateXml(service, tracingService, theme);
             webResourceId = ExecuteCreateThemeWebResource(service, tracingService, theme, xmlTheme);
             UpdateThemeEntity(service, tracingService, theme, webResourceId);
-            AddWebResourceToExistingSolution(service, tracingService, webResourceId, "pwuser_theme_solution");
         }
 
         private XmlDocument CreateXml(IOrganizationService service, ITracingService tracingService, Entity theme)
@@ -124,17 +119,21 @@ namespace pwuser.ThemeCreator.Plugins
 
             xmlTheme.AppendChild(appHeaderColorsNode);
             return xmlTheme;
-            //xmlTheme.Save(theme["name"].ToString().ToLower().Replace(" ", "") + ".xml");
         }
 
         private Guid ExecuteCreateThemeWebResource(IOrganizationService service, ITracingService tracingService, Entity theme, XmlDocument xmlTheme)
         {
             string xmlContent = xmlTheme.OuterXml;
+            string themeNameSource = theme["pwuser_name"].ToString();
+            string text1= themeNameSource.Normalize(NormalizationForm.FormD);
+            string text2 = Regex.Replace(text1, @"\p{Mn}", "");
+            string themeName = Regex.Replace(text2, @"[^a-zA-Z0-9]", "");
+            string webresourceName = "pwuser_/theme" + themeName + ".xml";
             Entity webResource = new Entity();
             Guid id = Guid.NewGuid();
             webResource.Id = Guid.NewGuid();
             webResource.LogicalName = "webresource";
-            webResource["name"] = "pwuser_/themes" + theme["pwuser_name"] +".xml";
+            webResource["name"] = webresourceName.Replace(" ", "");
             webResource["content"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(xmlContent));
             webResource["displayname"] = theme["pwuser_name"].ToString().ToLower().Replace(" ", "") + ".xml";
             webResource["description"] = "Modern theme";
@@ -168,89 +167,6 @@ namespace pwuser.ThemeCreator.Plugins
                 tracingService.Trace(errorMessage);
                 throw new InvalidPluginExecutionException(errorMessage);
             }
-        }
-
-        private void AddWebResourceToExistingSolution(IOrganizationService service, ITracingService tracingService, Guid webResourceId, string solutionUniqueName)
-        {
-            
-            QueryExpression query = new QueryExpression("solution");
-            query.ColumnSet = new ColumnSet("solutionid");
-            query.Criteria.AddCondition("uniquename", ConditionOperator.Equal, solutionUniqueName);
-            EntityCollection solutionEntities = service.RetrieveMultiple(query);
-
-            if (solutionEntities.Entities.Count > 0)
-            {
-                
-            }
-            else
-            {
-               CreateThemeSolution(service, tracingService,solutionUniqueName);
-              
-            }
-            AddWebResourceToSolution(service, tracingService, webResourceId, solutionUniqueName);
-        }
-
-        private void AddWebResourceToSolution(IOrganizationService service, ITracingService tracingService, Guid webResourceId, string solutionUniqueName)
-        {
-            AddSolutionComponentRequest request = new AddSolutionComponentRequest()
-            {
-                ComponentType = 61, //Entity is a known component type
-                ComponentId = webResourceId,
-                SolutionUniqueName = solutionUniqueName
-            };
-
-            try
-            {
-                var response = (AddSolutionComponentResponse)service.Execute(request);
-            }
-            catch (Exception ex)
-            {
-                string errorMessage = $"There was an error adding the theme into solution because {ex.Message}";
-                tracingService.Trace(errorMessage);
-                throw new InvalidPluginExecutionException(errorMessage);
-            }
-        }
-
-        private Guid CreateThemeSolution(IOrganizationService service, ITracingService tracingService, string solutionUniqueName)
-        {
-            Guid publisherId = GetPublisher(service, tracingService);
-            Guid solutionId = Guid.Empty; 
-            Entity solution = new Entity("solution");
-            solution["uniquename"] = solutionUniqueName;
-            solution["friendlyname"] = solutionUniqueName;
-            solution["description"] = "Themes";
-            solution["publisherid"] = new EntityReference("publisher", publisherId);
-            solution["ismanaged"] = true;
-            try
-            {
-                solutionId = service.Create(solution);
-            }catch(Exception ex)
-            {
-                string errorMessage = $"There was an error creating the theme solution because {ex.Message}";
-                tracingService.Trace(errorMessage);
-                throw new InvalidPluginExecutionException(errorMessage);
-            }
-            return solutionId;
-        }
-
-        private Guid GetPublisher(IOrganizationService service, ITracingService tracingService)
-        {
-            Guid publisherid= Guid.Empty;
-            QueryExpression query = new QueryExpression("publisher");
-            query.ColumnSet = new ColumnSet("publisherid");
-            query.Criteria.AddCondition("customizationprefix", ConditionOperator.Equal, "pwuser");
-            EntityCollection publishers = service.RetrieveMultiple(query);
-
-            if (publishers.Entities.Count > 0)
-            {
-                publisherid = publishers.Entities[0].Id;
-            }
-            else
-            {
-                string errorMessage = $"There is not pwuser prefix";
-                tracingService.Trace(errorMessage);
-            }
-            return publisherid;
         }
     }
 }

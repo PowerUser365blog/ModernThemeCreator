@@ -18,11 +18,6 @@
     if (webResourceName != null) {
         if (appId != null) {
             appUniqueName = await getAppUniqueName(appId);
-            solutionApp = await createSolutionWithApp(themeName, appId);
-            if (solutionApp != null) {
-                await addSolutionComponent(solutionApp.uniquename, settingId, 10030);
-                await addSolutionComponent(solutionApp.uniquename, appId, 80);
-            }
             var execute_SaveSettingValue_Request = {
                 AppUniqueName: appUniqueName,
                 SettingName: "OverrideAppHeaderColor",
@@ -62,28 +57,18 @@
                 if (response.ok) {
                     console.log("Success");
                     var fetchXml = "";
-                    var solutionExist = await getSolution(solutionUniqueName);
-                    var orgSettingValueId = await getSettingValueId(settingId);
                     if (appId == null) {
                         formContext.getAttribute("statuscode").setValue(946700001);
                         fetchXml = await getDefaultThemePublished(entityName, publishedApp);
 
                     } else {
                         formContext.getAttribute("statuscode").setValue(946700002);
-                        var appSettingValueId = await getAppSettingValueId(settingId, appId);
                         fetchXml = await checkAppThemeDuplicated(entityName, publishedApp, appId);
-                        if (solutionApp != null) {
-                            addSolutionComponent(solutionApp.uniquename, appSettingValueId, 10027);
-                        }
                         publishApp(appId);
 
                     }
                     await updateFieldInRecords(entityName, fetchXml, draft, fieldName);
                     formContext.data.entity.save();
-                    if (solutionExist) {
-                        addSolutionComponent(solutionUniqueName, settingId, 10030);
-                        addSolutionComponent(solutionUniqueName, orgSettingValueId, 10029);
-                    }
 
                 }
             }
@@ -110,7 +95,7 @@ async function getAppUniqueName(appId) {
 
 async function getAppSettingValueId(settingId, appId) {
     var AppSettingId = "";
-    await Xrm.WebApi.retrieveMultipleRecords("appsetting", "?$filter=(_parentappmoduleid_value eq '" + appId + "'and _settingdefinitionid_value eq '" + settingId + "')").then(
+    await Xrm.WebApi.retrieveMultipleRecords("appsetting", "?$filter=(_parentappmoduleid_value eq '" + appId + "'and _settingdefinitionid_value eq '" + settingId +"')").then(
         function success(results) {
             console.log(results);
             if (results.entities.length > 0) {
@@ -139,26 +124,9 @@ async function getwebResourceName(webResourceId) {
     return webresourceidunique;
 }
 
-
-async function getSolution(solutionUniqueName) {
-    var solutionExist = false;
-    await Xrm.WebApi.retrieveMultipleRecords("solution", "?$filter=uniquename eq '" + solutionUniqueName + "'").then(
-        function success(results) {
-            console.log(results);
-            if (results.entities.length > 0) {
-                solutionExist = true;
-            };
-        },
-        function (error) {
-            console.log(error.message);
-        }
-    );
-    return solutionExist;
-}
-
 async function getSettingId(settingUniqueName) {
     var settingId = "";
-    await Xrm.WebApi.retrieveMultipleRecords("settingdefinition", "?$filter=uniquename eq '" + settingUniqueName + "'").then(
+    await Xrm.WebApi.retrieveMultipleRecords("settingdefinition", "?$filter=uniquename eq '"+settingUniqueName+"'").then(
         function success(results) {
             console.log(results);
             if (results.entities.length > 0) {
@@ -186,40 +154,6 @@ async function getSettingValueId(settingId) {
     return settingValueId;
 };
 
-function addSolutionComponent(solutionUniqueName, settingId, componentType) {
-    var execute_AddSolutionComponent_Request = {
-        SolutionUniqueName: solutionUniqueName,
-        ComponentId: { guid: settingId },
-        ComponentType: componentType,
-        AddRequiredComponents: false,
-        getMetadata: function () {
-            return {
-                boundParameter: null,
-                parameterTypes: {
-                    ComponentId: { typeName: "Edm.Guid", structuralProperty: 1 },
-                    ComponentType: { typeName: "Edm.Int32", structuralProperty: 1 },
-                    SolutionUniqueName: { typeName: "Edm.String", structuralProperty: 1 },
-                    AddRequiredComponents: { typeName: "Edm.Boolean", structuralProperty: 1 }
-                },
-                operationType: 0, operationName: "AddSolutionComponent"
-            };
-        }
-    };
-    Xrm.WebApi.execute(execute_AddSolutionComponent_Request).then(
-        function success(response) {
-            if (response.ok) { return response.json(); }
-        }
-    ).then(function (responseBody) {
-        var result = responseBody;
-        console.log(result);
-        // Return Type: mscrm.AddSolutionComponentResponse
-        // Output Parameters
-        var id = result["id"]; // Edm.Guid
-    }).catch(function (error) {
-        console.log(error.message);
-    });
-}
-
 function showPublishButton(executionContext) {
     var formContext = executionContext.getFormContext != null ? executionContext.getFormContext() : executionContext;
     var themeStatus = formContext.getAttribute("statuscode").getValue();
@@ -234,7 +168,7 @@ function showPublishButton(executionContext) {
 async function updateFieldInRecords(entityName, fetchXml, draft, fieldName) {
 
     try {
-
+        
         var results = await Xrm.WebApi.retrieveMultipleRecords(entityName, "?fetchXml=" + fetchXml);
 
         for (var entity of results.entities) {
@@ -252,7 +186,7 @@ async function updateFieldInRecords(entityName, fetchXml, draft, fieldName) {
     }
 }
 
-function checkAppThemeDuplicated(entityName, publishedApp, appId) {
+function checkAppThemeDuplicated(entityName,publishedApp,appId) {
     var fetchXml = "<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>" +
         "  <entity name='" + entityName + "'>" +
         "    <attribute name='" + entityName + "id' />" +
@@ -266,7 +200,7 @@ function checkAppThemeDuplicated(entityName, publishedApp, appId) {
     return fetchXml;
 }
 
-function getDefaultThemePublished(entityName, publishedApp) {
+function getDefaultThemePublished(entityName,publishedApp) {
     var fetchXml = "<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>" +
         "  <entity name='" + entityName + "'>" +
         "    <attribute name='" + entityName + "id' />" +
@@ -278,68 +212,26 @@ function getDefaultThemePublished(entityName, publishedApp) {
 
     return fetchXml;
 }
-
-async function createSolutionWithApp(themeName, appId,) {
-    var publisherName = "pwuser";
-    var publisherId = await getPublisher(publisherName);
-    var record = {};
-    record.uniquename = "pwuser_appTheme" + themeName; // Text
-    record["publisherid@odata.bind"] = "/publishers(" + publisherId + ")"; // Lookup
-    record.friendlyname = "pwuser_appTheme" + themeName;
-    record.description = "Solution to manage App theme";
-    record.version = "1.0";
-    var solutionExist = await getSolution(record.uniquename);
-    if (!solutionExist) {
-        try {
-            solutionObj = await Xrm.WebApi.createRecord("solution", record);
-        } catch {
-            console.log("Error creating the solution: " + error.message);
-        }
-        var solution = {};
-        solution.id = solutionObj.id;
-        solution.uniquename = record.uniquename;
-
-        return solution;
-    } else {
-        return null
-    }
-}
-
 function publishApp(appId) {
-    var execute_PublishXml_Request = {
-        ParameterXml: "<importexportxml><appmodules><appmodule>{" + appId + "}</appmodule></appmodules></importexportxml>",
-        getMetadata: function () {
-            return {
-                boundParameter: null,
-                parameterTypes: {
-                    ParameterXml: { typeName: "Edm.String", structuralProperty: 1 }
-                },
-                operationType: 0, operationName: "PublishXml"
-            };
-        }
-    };
-    Xrm.WebApi.execute(execute_PublishXml_Request).then(
-        function success(response) {
-            if (response.ok) { console.log("Success"); }
-        }
-    ).catch(function (error) {
-        console.log(error.message);
-    });
-}
-async function getPublisher(publisherName) {
-    try {
-        var result = await Xrm.WebApi.retrieveMultipleRecords("publisher", "?$select=publisherid&$filter=customizationprefix eq '" + publisherName + "'");
+     var execute_PublishXml_Request = {
+         ParameterXml: "<importexportxml><appmodules><appmodule>{" + appId + "}</appmodule></appmodules></importexportxml>",
+         getMetadata: function () {
+             return {
+                 boundParameter: null,
+                 parameterTypes: {
+                     ParameterXml: { typeName: "Edm.String", structuralProperty: 1 }
+                 },
+                 operationType: 0, operationName: "PublishXml"
+             };
+         }
+     };
+     Xrm.WebApi.execute(execute_PublishXml_Request).then(
+         function success(response) {
+             if (response.ok) { console.log("Success"); }
+         }
+     ).catch(function (error) {
+         console.log(error.message);
+     });
+ }
 
-        if (result.entities.length > 0) {
-            var publisherId = result.entities[0].publisherid;
-            return publisherId;
-        } else {
-            console.log("No se encontró ningún publisher con el nombre " + publisherName);
-            return null;
-        }
-    } catch (error) {
-        console.log("Error al recuperar el publisher:", error.message);
-        return null;
-    }
-}
 
